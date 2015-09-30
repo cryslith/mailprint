@@ -1,0 +1,2 @@
+syntax: regexp
+\.(log|aux|pdf)$

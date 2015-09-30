@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# temporary mock of real script
+tee -a "$MAILPRINT_DIR/mailprint_log" | grep squeeble > "$MAILPRINT_DIR/squeeble"

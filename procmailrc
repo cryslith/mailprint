@@ -1,0 +1,7 @@
+SHELL="/bin/sh"
+TAG="$1"
+MAILPRINT_DIR="$HOME/mailprint"
+MAILPRINT="$MAILPRINT_DIR/mailprint"
+:0
+* TAG ?? ^^mailprint^^
+| "$SHELL" -c "MAILPRINT_DIR=\"$MAILPRINT_DIR\" $MAILPRINT"
