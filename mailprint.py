@@ -6,6 +6,7 @@ import email.parser, email.message
 import re
 import subprocess
 import traceback
+import os
 
 
 ZEPHYR_CLASS = ['-c', 'mailprint']
@@ -21,8 +22,8 @@ def send_zephyr(zdest, instance, message):
     p.stdin.close()
 
 
-def zephyr_error(e):
-    send_zephyr(ZEPHYR_CLASS, 'error', traceback.format_exc(e))
+def zephyr_error():
+    send_zephyr(ZEPHYR_CLASS, 'error', ''.join(traceback.format_exc()))
 
 
 class MailprintError(Exception):
@@ -34,17 +35,23 @@ class MailprintError(Exception):
         send_zephyr(self.zephyr_destination, 'error', self.message)
 
 
-def spool_file(name, content, username, doublesided=False):
-    p = subprocess.Popen(['lpr',
-                          '-P', 'mitprint',
+def spool_file(name, content, username, pdf):
+    if pdf:
+        conv = subprocess.Popen(['pdf2ps', '-', '-'], stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE)
+
+    mailprint_dir = os.getenv('MAILPRINT_DIR', '.')
+    p = subprocess.Popen([mailprint_dir + '/rlpr', '--no-bind',
+                          '-P', 'bw@mitprint.mit.edu',  # TODO color print
                           '-C', name,
-                          '-U', username] +
-                         (['-o', 'sides=two-sided-long-edge']
-                          if doublesided
-                          else ['-o', 'sides=one-sided']),
-                         stdin=subprocess.PIPE)
-    p.stdin.write(content)
-    p.stdin.close()
+                          '-J', name,
+                          '-T', name,
+                          '-U', username],
+                         stdin=(conv.stdout if pdf else subprocess.PIPE))
+
+    pipe = (conv if pdf else p).stdin
+    pipe.write(content)
+    pipe.close()
 
 
 def main():
@@ -63,8 +70,9 @@ def main():
         for part in msg.walk():
             if not part.get_filename():
                 continue
+            pdf = part.get_content_type() == 'application/pdf'
             spool_file(part.get_filename(), part.get_payload(decode=True),
-                       username)
+                       username, pdf)
             send_zephyr([username], 'info',
                         'Spooled file: ' + part.get_filename())
             spooled_file = True
@@ -76,8 +84,8 @@ def main():
     except MailprintError as e:
         e.send_zephyr()
         raise
-    except Exception as e:
-        zephyr_error(e)
+    except Exception:
+        zephyr_error()
         raise
 
 if __name__ == '__main__':

@@ -1,3 +1,5 @@
 #!/bin/sh
 
+export MAILPRINT_DIR
+
 "$MAILPRINT_DIR/mailprint.py" 2>>"$MAILPRINT_DIR/error.log"
