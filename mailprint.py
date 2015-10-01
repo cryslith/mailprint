@@ -10,6 +10,7 @@ import os
 
 
 ZEPHYR_CLASS = ['-c', 'mailprint']
+TYPE_WHITELIST = ['application/pdf', 'application/postscript']
 
 
 def send_zephyr(zdest, instance, message):
@@ -37,10 +38,13 @@ class MailprintError(Exception):
 
 def spool_file(name, content, username, pdf):
     if pdf:
+        # rlpr can't print pdf directly
         conv = subprocess.Popen(['pdf2ps', '-', '-'], stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
 
     mailprint_dir = os.getenv('MAILPRINT_DIR', '.')
+    # printers aren't configured on the scripts servers, so use rlpr to
+    # print over the network
     p = subprocess.Popen([mailprint_dir + '/rlpr', '--no-bind',
                           '-P', 'bw@mitprint.mit.edu',  # TODO color print
                           '-C', name,
@@ -68,19 +72,28 @@ def main():
         username = match.group(1)
         spooled_file = False
         for part in msg.walk():
-            if not part.get_filename():
+            name = part.get_filename()
+            if not name:
                 continue
-            pdf = part.get_content_type() == 'application/pdf'
-            spool_file(part.get_filename(), part.get_payload(decode=True),
-                       username, pdf)
-            send_zephyr([username], 'info',
-                        'Spooled file: ' + part.get_filename())
+            mimetype = part.get_content_type()
+            if (mimetype not in TYPE_WHITELIST and
+                part.get_content_maintype() != 'text'):
+                send_zephyr([username], 'error',
+                            'file ' + part.get_filename() +
+                            ' has illegal type ' + mimetype +
+                            '\nplease send a text file, ' +
+                            'or a file with type:\n' +
+                            '\n'.join(TYPE_WHITELIST))
+                continue
+            pdf = mimetype == 'application/pdf'
+            spool_file(name, part.get_payload(decode=True), username, pdf)
+            send_zephyr([username], 'info', 'Spooled file: ' + name)
             spooled_file = True
         if not spooled_file:
             subject = msg.get('Subject')
-            send_zephyr([username], 'info',
+            send_zephyr([username], 'error',
                         'Your print request with subject:\n' + subject +
-                        '\nwas received, but had no attachments.')
+                        '\nwas received, but had no printable attachments.')
     except MailprintError as e:
         e.send_zephyr()
         raise
