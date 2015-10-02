@@ -36,7 +36,7 @@ class MailprintError(Exception):
         send_zephyr(self.zephyr_destination, 'error', self.message)
 
 
-def spool_file(name, content, username, pdf):
+def spool_file(name, content, username, pdf, color=False):
     if pdf:
         # rlpr can't print pdf directly
         conv = subprocess.Popen(['pdf2ps', '-', '-'], stdin=subprocess.PIPE,
@@ -46,7 +46,8 @@ def spool_file(name, content, username, pdf):
     # printers aren't configured on the scripts servers, so use rlpr to
     # print over the network
     p = subprocess.Popen([mailprint_dir + '/rlpr', '--no-bind',
-                          '-P', 'bw@mitprint.mit.edu',  # TODO color print
+                          '-P',
+                          ('color' if color else 'bw') + '@mitprint.mit.edu',
                           '-C', name,
                           '-J', name,
                           '-T', name,
@@ -70,6 +71,7 @@ def main():
             raise MailprintError('could not identify sender: ' +
                                  msg.get_unixfrom())
         username = match.group(1)
+        subject = msg.get('Subject')
         spooled_file = False
         for part in msg.walk():
             name = part.get_filename()
@@ -86,11 +88,11 @@ def main():
                             '\n'.join(TYPE_WHITELIST))
                 continue
             pdf = mimetype == 'application/pdf'
-            spool_file(name, part.get_payload(decode=True), username, pdf)
+            spool_file(name, part.get_payload(decode=True), username, pdf,
+                       'color' in subject)
             send_zephyr([username], 'info', 'Spooled file: ' + name)
             spooled_file = True
         if not spooled_file:
-            subject = msg.get('Subject')
             send_zephyr([username], 'error',
                         'Your print request with subject:\n' + subject +
                         '\nwas received, but had no printable attachments.')
