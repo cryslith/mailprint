@@ -7,6 +7,7 @@ import re
 import subprocess
 import traceback
 import os
+import random
 
 
 ZEPHYR_CLASS = ['-c', 'mailprint']
@@ -17,7 +18,7 @@ def send_zephyr(zdest, instance, message):
     p = subprocess.Popen(['zwrite', '-d'] + zdest +
                          ['-i', 'mailprint: ' + instance,
                           '-S', 'mailprint',
-                          '-s', 'printprintprintprintprint'],
+                          '-s', 'print' * random.randint(1, 5) + '!'],
                          stdin=subprocess.PIPE, universal_newlines=True)
     p.stdin.write(message)
     p.stdin.close()
