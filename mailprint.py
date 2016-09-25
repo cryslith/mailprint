@@ -76,6 +76,28 @@ def spool_file(name, content, username, pdf, color=False):
     pipe.close()
 
 
+def search_mit_user(s):
+    if s:
+        match = re.search(r'\b([a-zA-Z]+)@mit\.edu\b', s)
+        if match:
+            return match.group(1)
+    return None
+
+
+def get_username(msg):
+    u = search_mit_user(msg.get_unixfrom())
+    if u:
+        return u
+    u = search_mit_user(msg.get('Sender'))
+    if u:
+        return u
+    u = search_mit_user(msg.get('From'))
+    if u:
+        return u
+
+    return None
+
+
 def main():
     username = None
     try:
@@ -83,11 +105,11 @@ def main():
         # parser = email.parser.Parser(_class=email.message.EmailMessage)
         parser = email.parser.Parser()
         msg = parser.parse(sys.stdin)
-        match = re.search(r'\b([a-zA-Z]+)@mit\.edu\b', msg.get_unixfrom())
-        if not match:
-            raise MailprintError('could not identify sender: ' +
-                                 msg.get_unixfrom())
-        username = match.group(1)
+        username = get_username(msg)
+        if not username:
+            raise MailprintError(
+                'could not identify sender: {} | {} | {}'.format(
+                    msg.get_unixfrom(), msg.get('Sender'), msg.get('From')))
         subject = msg.get('Subject')
         spooled_file = False
         for part in msg.walk():
