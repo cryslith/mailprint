@@ -24,6 +24,7 @@ import subprocess
 import traceback
 import os
 import random
+import datetime
 
 
 ZEPHYR_CLASS = ['-c', 'mailprint']
@@ -41,8 +42,9 @@ def send_zephyr(zdest, instance, message):
 
 
 def zephyr_error():
-    send_zephyr(ZEPHYR_CLASS, 'error', ''.join(traceback.format_exc()))
-
+    send_zephyr(ZEPHYR_CLASS,
+                'error',
+                ''.join(traceback.format_exc()))
 
 class MailprintError(Exception):
     def __init__(self, msg, zdest=ZEPHYR_CLASS):
@@ -110,7 +112,11 @@ def main():
             raise MailprintError(
                 'could not identify sender: {} | {} | {}'.format(
                     msg.get_unixfrom(), msg.get('Sender'), msg.get('From')))
+        print('[{}] incoming message from {}'.format(
+                datetime.datetime.now(), username), file=sys.stderr)
         subject = msg.get('Subject')
+        if not subject:
+            subject = ''
         spooled_file = False
         for part in msg.walk():
             name = part.get_filename()
